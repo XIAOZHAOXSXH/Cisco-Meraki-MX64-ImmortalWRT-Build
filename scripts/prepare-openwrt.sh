@@ -139,6 +139,9 @@ find_package_root() {
 ARGON_DIR="$OPENWRT_DIR/package/feeds/luci/luci-theme-argon"
 [[ -d "$ARGON_DIR" ]] || ARGON_DIR="$(find_package_root luci-theme-argon)"
 [[ -n "$ARGON_DIR" && -d "$ARGON_DIR" ]] || die "luci-theme-argon was not installed"
+# feeds install the package through a symlink; resolve it so patch/install
+# operate on the actual Argon package directory rather than the feed repo root.
+ARGON_DIR="$(cd "$ARGON_DIR" && pwd -P)"
 
 for required_path in \
 	"$ARGON_DIR/ucode/template/themes/argon/header.ut" \
@@ -151,11 +154,11 @@ done
 PATCH_FILE="$REPOSITORY_ROOT/patches/luci-theme-argon-branding.patch"
 if ! grep -q 'mx64-branding.css' "$ARGON_DIR/ucode/template/themes/argon/header.ut" || \
 	! grep -q 'mx64-logo.jpg' "$ARGON_DIR/ucode/template/themes/argon/sysauth.ut"; then
-	if git -C "$ARGON_DIR" apply --check -p1 "$PATCH_FILE" >/dev/null 2>&1; then
-		git -C "$ARGON_DIR" apply -p1 "$PATCH_FILE"
-	elif command -v patch >/dev/null 2>&1 && \
+	if command -v patch >/dev/null 2>&1 && \
 		patch --dry-run -d "$ARGON_DIR" -p1 < "$PATCH_FILE" >/dev/null 2>&1; then
 		patch -d "$ARGON_DIR" -p1 < "$PATCH_FILE"
+	elif git -C "$ARGON_DIR" apply --check --no-index -p1 "$PATCH_FILE" >/dev/null 2>&1; then
+		git -C "$ARGON_DIR" apply --no-index -p1 "$PATCH_FILE"
 	else
 		die "Argon branding patch does not apply to this source layout"
 	fi
@@ -186,6 +189,8 @@ done
 
 grep -q 'mx64-branding.css' "$ARGON_DIR/ucode/template/themes/argon/header.ut" || \
 	die "Argon header patch verification failed"
+grep -q 'mx64-branding.css' "$ARGON_DIR/ucode/template/themes/argon/header_login.ut" || \
+	die "Argon login header patch verification failed"
 grep -q 'mx64-logo.jpg' "$ARGON_DIR/ucode/template/themes/argon/sysauth.ut" || \
 	die "Argon login logo patch verification failed"
 
