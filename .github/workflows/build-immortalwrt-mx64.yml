@@ -83,7 +83,7 @@ jobs:
               exit 1
             }
           done
-          if grep -Eq '^CONFIG_TARGET_DEVICE_bcm53xx_generic_DEVICE_meraki_mx64-a0=y$' "$openwrt_dir/.config"; then
+          if grep -Eq '^CONFIG_TARGET_DEVICE_bcm53xx_generic_DEVICE_meraki_mx64_a0=y$' "$openwrt_dir/.config"; then
             echo 'The A0 device variant must not be enabled for this build.' >&2
             exit 1
           fi
