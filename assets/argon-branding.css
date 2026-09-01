@@ -1,0 +1,40 @@
+/* Xtreme Link branding for the Argon header and login page. */
+.login-page .login-container .login-form .brand {
+  width: min(18rem, calc(100vw - 3rem));
+  margin: 2rem auto 3rem;
+}
+
+.login-page .login-container .login-form .brand .icon,
+.main-left .sidenav-header .brand .mx64-brand-logo,
+header .fill .container .flex1 .brand .mx64-brand-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  object-fit: contain;
+}
+
+.login-page .login-container .login-form .brand .icon {
+  max-height: 8.5rem;
+}
+
+.login-page .login-container .login-form .brand .brand-text {
+  display: none;
+}
+
+.main-left .sidenav-header .brand {
+  width: 10rem;
+  margin: 0 auto;
+}
+
+header .fill .container .flex1 .brand {
+  width: 8.75rem;
+  padding-left: 0.75rem;
+  vertical-align: middle;
+}
+
+@media screen and (max-width: 768px) {
+  header .fill .container .flex1 .brand {
+    display: inline-block;
+  }
+}

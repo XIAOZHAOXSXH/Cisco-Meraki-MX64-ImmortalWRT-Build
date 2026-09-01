@@ -1,0 +1,12 @@
+# Reproducible source pins used by scripts/prepare-openwrt.sh.
+IMMORTALWRT_REPOSITORY=https://github.com/immortalwrt/immortalwrt.git
+IMMORTALWRT_BRANCH=openwrt-24.10
+IMMORTALWRT_COMMIT=99ca94091f673607bdcb92ba1f93bda1e811fc93
+
+IMMORTALWRT_LUCI_REPOSITORY=https://github.com/immortalwrt/luci.git
+IMMORTALWRT_LUCI_BRANCH=openwrt-24.10
+IMMORTALWRT_LUCI_COMMIT=9b8ee6470c5eb1e5189f1a7f25bc8ee958e2a7c3
+
+KENZOK8_SMALL_REPOSITORY=https://github.com/kenzok8/small.git
+KENZOK8_SMALL_BRANCH=master
+KENZOK8_SMALL_COMMIT=1def825880c344412ba3a0086d9e28c55602791c

@@ -1,0 +1,9 @@
+#!/bin/sh
+
+uci -q batch <<'EOF'
+set luci.themes.Argon=/luci-static/argon
+set luci.main.mediaurlbase=/luci-static/argon
+commit luci
+EOF
+
+exit 0

@@ -1,0 +1,184 @@
+name: Build ImmortalWrt for Cisco Meraki MX64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+      - docs/**
+  schedule:
+    - cron: '17 3 1 * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mx64-immortalwrt-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build MX64 firmware
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Check out build configuration
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison gawk gettext git \
+            libncurses-dev libssl-dev libelf-dev libxml2-utils xsltproc \
+            python3 python3-setuptools python3-pyelftools perl rsync unzip \
+            zlib1g-dev file wget curl ccache device-tree-compiler patch
+
+      - name: Check out pinned ImmortalWrt
+        id: source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          source "$GITHUB_WORKSPACE/sources.lock"
+          openwrt_dir="$RUNNER_TEMP/immortalwrt"
+          git clone --no-tags --filter=blob:none --depth=1 --branch "$IMMORTALWRT_BRANCH" "$IMMORTALWRT_REPOSITORY" "$openwrt_dir"
+          git -C "$openwrt_dir" fetch --no-tags --filter=blob:none --depth=1 origin "$IMMORTALWRT_COMMIT"
+          git -C "$openwrt_dir" checkout -q --detach "$IMMORTALWRT_COMMIT"
+          test "$(git -C "$openwrt_dir" rev-parse HEAD)" = "$IMMORTALWRT_COMMIT"
+          echo "openwrt_dir=$openwrt_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare feeds and Argon branding
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash "$GITHUB_WORKSPACE/scripts/prepare-openwrt.sh" \
+            "${{ steps.source.outputs.openwrt_dir }}" "$GITHUB_WORKSPACE"
+
+      - name: Apply MX64 configuration and run preflight
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          openwrt_dir="${{ steps.source.outputs.openwrt_dir }}"
+          cp "$GITHUB_WORKSPACE/config/mx64.config" "$openwrt_dir/.config"
+          make -C "$openwrt_dir" defconfig
+
+          required_config=(
+            CONFIG_TARGET_bcm53xx=y
+            CONFIG_TARGET_bcm53xx_generic=y
+            CONFIG_TARGET_DEVICE_bcm53xx_generic_DEVICE_meraki_mx64=y
+            CONFIG_PACKAGE_luci-theme-argon=y
+            CONFIG_PACKAGE_luci-app-openclash=y
+            CONFIG_PACKAGE_luci-app-passwall=y
+          )
+          for expected in "${required_config[@]}"; do
+            grep -Fxq "$expected" "$openwrt_dir/.config" || {
+              echo "Missing required Kconfig entry: $expected" >&2
+              exit 1
+            }
+          done
+          if grep -Eq '^CONFIG_TARGET_DEVICE_bcm53xx_generic_DEVICE_meraki_mx64-a0=y$' "$openwrt_dir/.config"; then
+            echo 'The A0 device variant must not be enabled for this build.' >&2
+            exit 1
+          fi
+          test -f "$openwrt_dir/package/feeds/small/luci-app-openclash/Makefile"
+          test -f "$openwrt_dir/package/feeds/small/luci-app-passwall/Makefile"
+          test -f "$openwrt_dir/package/feeds/luci/luci-theme-argon/Makefile"
+          echo "Target configuration:"
+          grep -E '^(CONFIG_TARGET|CONFIG_PACKAGE_luci-(theme-argon|app-(openclash|passwall)))' "$openwrt_dir/.config"
+
+      - name: Download package sources
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make -C "${{ steps.source.outputs.openwrt_dir }}" download -j"$(nproc)"
+
+      - name: Compile firmware
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          openwrt_dir="${{ steps.source.outputs.openwrt_dir }}"
+          if ! make -C "$openwrt_dir" -j"$(nproc)" V=s; then
+            echo 'Parallel build failed; retrying serially for a complete diagnostic log.' >&2
+            make -C "$openwrt_dir" -j1 V=s
+          fi
+
+      - name: Collect and verify MX64 artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          openwrt_dir="${{ steps.source.outputs.openwrt_dir }}"
+          target_dir="$openwrt_dir/bin/targets/bcm53xx/generic"
+          release_dir="$GITHUB_WORKSPACE/release"
+          mkdir -p "$release_dir"
+
+          mapfile -t sysupgrade_images < <(find "$target_dir" -maxdepth 1 -type f \
+            \( -iname '*sysupgrade*.bin' -o -iname '*sysupgrade*.tar' \) \
+            ! -iname '*a0*' -print | sort)
+          ((${#sysupgrade_images[@]} > 0)) || {
+            echo "No non-A0 MX64 sysupgrade image was produced in $target_dir" >&2
+            find "$target_dir" -maxdepth 1 -type f -print >&2
+            exit 1
+          }
+
+          for image in "${sysupgrade_images[@]}"; do
+            case "$(basename "$image")" in
+              *meraki_mx64*|*meraki-mx64*) ;;
+              *) echo "Unexpected sysupgrade image name: $image" >&2; exit 1 ;;
+            esac
+            cp -f "$image" "$release_dir/"
+          done
+
+          if [[ -f "$target_dir/sha256sums" ]]; then
+            cp -f "$target_dir/sha256sums" "$release_dir/upstream-sha256sums"
+          fi
+          find "$target_dir" -maxdepth 1 -type f \
+            \( -name '*meraki_mx64*' -o -name '*meraki-mx64*' \) \
+            ! -name '*a0*' -print | while read -r artifact; do
+            [[ "$artifact" == *sysupgrade* ]] || cp -f "$artifact" "$release_dir/"
+          done
+          cp -f "$openwrt_dir/.config" "$release_dir/mx64.config"
+          (cd "$release_dir" && sha256sum * > SHA256SUMS)
+          printf '%s\n' "${sysupgrade_images[@]##*/}" > "$release_dir/SYSUPGRADE_IMAGE"
+          cat > "$release_dir/RELEASE_NOTES.md" <<'EOF'
+          This release contains an ImmortalWrt build for the Cisco Meraki MX64
+          (non-A0 hardware variant, target `bcm53xx/generic/meraki_mx64`).
+
+          The image uses Argon as the default LuCI theme and includes OpenClash
+          and PassWall from the pinned `kenzok8/small` feed. Do not flash this
+          image on an MX64 A0 unit.
+          EOF
+          echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-mx64-${{ github.run_id }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_DIR: ${{ steps.artifacts.outputs.release_dir }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tag="mx64-build-${GITHUB_RUN_ID}"
+          title="ImmortalWrt MX64 build ${GITHUB_RUN_NUMBER}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber "$RELEASE_DIR"/*
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "$title" --notes-file "$RELEASE_DIR/RELEASE_NOTES.md" \
+              "$RELEASE_DIR"/*
+          fi

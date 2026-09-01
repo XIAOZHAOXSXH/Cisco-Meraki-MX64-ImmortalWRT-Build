@@ -1,0 +1,16 @@
+# Local ImmortalWrt trees and generated build output
+immortalwrt/
+release/
+bin/
+build_dir/
+staging_dir/
+feeds/
+.config
+feeds.conf
+
+# Editor and OS metadata
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store

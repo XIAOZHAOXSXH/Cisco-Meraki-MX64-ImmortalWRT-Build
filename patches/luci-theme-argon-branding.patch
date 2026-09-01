@@ -1,0 +1,57 @@
+diff --git a/ucode/template/themes/argon/header.ut b/ucode/template/themes/argon/header.ut
+index 92c61ca..a0b0a10 100644
+--- a/ucode/template/themes/argon/header.ut
++++ b/ucode/template/themes/argon/header.ut
+@@ -91,6 +91,7 @@
+ 	<link rel="manifest" href="{{ media }}/icon/manifest.json" crossorigin="use-credentials">
+ 
+ 	<link rel="stylesheet" href="{{ media }}/css/cascade.css{# ?v=PKG_VERSION #}">
++	<link rel="stylesheet" href="{{ media }}/css/mx64-branding.css">
+ 	<style title="text/css">
+ 		{% if (mode == 'normal'): %}
+ 			@media (prefers-color-scheme: dark) {
+@@ -132,7 +133,7 @@
+ 	<div class="main">
+ 		<div class="main-left" id="mainmenu" style="display:none">
+ 			<div class="sidenav-header d-flex align-items-center">
+-				<a class="brand" href="#">{{ hostname }}</a>
++				<a class="brand" href="#"><img src="{{ media }}/img/mx64-logo.jpg" class="mx64-brand-logo" alt="{{ hostname }}"></a>
+ 				<div class="ml-auto">
+ 					<!-- Sidenav toggler -->
+ 					<div class="sidenav-toggler d-none d-xl-block active" data-action="sidenav-unpin"
+@@ -152,7 +153,7 @@
+ 					<div class="container">
+ 						<div class="flex1">
+ 							<a class="showSide"></a>
+-							<a class="brand" href="#">{{ hostname }}</a>
++							<a class="brand" href="#"><img src="{{ media }}/img/mx64-logo.jpg" class="mx64-brand-logo" alt="{{ hostname }}"></a>
+ 						</div>
+ 						<div class="status" id="indicators"></div>
+ 					</div>
+diff --git a/ucode/template/themes/argon/header_login.ut b/ucode/template/themes/argon/header_login.ut
+index bc40263..e46e023 100644
+--- a/ucode/template/themes/argon/header_login.ut
++++ b/ucode/template/themes/argon/header_login.ut
+@@ -90,6 +90,7 @@
+ 	<link rel="manifest" href="{{ media }}/icon/manifest.json" crossorigin="use-credentials">
+ 
+ 	<link rel="stylesheet" href="{{ media }}/css/cascade.css{# ?v=PKG_VERSION #}">
++	<link rel="stylesheet" href="{{ media }}/css/mx64-branding.css">
+ 	<style title="text/css">
+ 		{% if (mode == 'normal'): %}
+ 			@media (prefers-color-scheme: dark) {
+diff --git a/ucode/template/themes/argon/sysauth.ut b/ucode/template/themes/argon/sysauth.ut
+index 418ec2e..a4f4657 100644
+--- a/ucode/template/themes/argon/sysauth.ut
++++ b/ucode/template/themes/argon/sysauth.ut
+@@ -115,9 +115,7 @@
+ 	<div class="login-container">
+ 		<div class="login-form">
+ 			<!-- Logo Start -->
+-			<a class="brand" href="/"><img src="{{ media }}/img/argon.svg" class="icon">
+-				<span class="brand-text">{{ hostname }}</span>
+-			</a>
++			<a class="brand" href="/"><img src="{{ media }}/img/mx64-logo.jpg" class="icon" alt="{{ hostname }}"></a>
+ 			<!-- Logo End -->
+ 			<!-- Login Form Start -->
+ 			<form class="form-login" method="post" action="{{ http.getenv("REQUEST_URI") }}">
